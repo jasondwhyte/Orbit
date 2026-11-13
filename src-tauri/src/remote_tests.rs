@@ -371,9 +371,12 @@ async fn request(port: u16, method: &str, path: &str, token: &str) -> (u16, Stri
     let status = response[9..12].parse().unwrap();
     (status, response)
 }
-/// A free port below the ephemeral range. Port 0 would hand out ports that
-/// other tests' client connections can take as their local port meanwhile,
-/// so a server restarting on its port could find it in use.
+/// A free port, mostly below the ephemeral range. Port 0 would hand out
+/// ports that other tests' client connections can take as their local port
+/// meanwhile, so a server restarting on its port could find it in use.
+/// A machine whose ephemeral range reaches lower can still give one away
+/// between this and the server binding it, so tests that turn access on
+/// use `turn_on`, which moves on to another port when that happens.
 fn free_port() -> u16 {
     use std::sync::atomic::{AtomicU16, Ordering};
     static NEXT: AtomicU16 = AtomicU16::new(0);
@@ -383,6 +386,42 @@ fn free_port() -> u16 {
         if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
             return port;
         }
+    }
+}
+/// Turns browser access on at a free port, and returns the port with the
+/// status. A port something else took after `free_port` let it go (seen on
+/// CI runners) is swapped for the next one; any other error fails the test.
+async fn turn_on(access: &Access) -> (u16, Status) {
+    for _ in 0..20 {
+        let port = free_port();
+        let status = access.set(true, port).await.unwrap();
+        if status.running {
+            return (port, status);
+        }
+        let taken = format!("Port {port} is not available");
+        assert!(
+            status
+                .error
+                .as_deref()
+                .is_some_and(|e| e.starts_with(&taken)),
+            "{status:?}"
+        );
+    }
+    panic!("no free port in 20 tries");
+}
+/// Waits until nothing takes connections on `port`. Turning access off
+/// doesn't wait for the server to let go of its listener (see `stop`).
+async fn until_closed(port: u16) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while tokio::net::TcpStream::connect(("127.0.0.1", port))
+        .await
+        .is_ok()
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "port {port} still takes connections"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
     }
 }
 fn link_token(status: &Status) -> String {
@@ -410,9 +449,7 @@ async fn turns_on_and_off_from_settings() {
     assert!(!status.enabled && !status.running && status.link.is_none());
     assert_eq!(status.port, DEFAULT_PORT);
 
-    let port = free_port();
-    let status = access.set(true, port).await.unwrap();
-    assert!(status.running, "{status:?}");
+    let (port, status) = turn_on(&access).await;
     assert_eq!(status.error, None);
     let link = status.link.clone().unwrap();
     assert!(link.starts_with(&format!("http://127.0.0.1:{port}/#token=")));
@@ -446,9 +483,7 @@ async fn turns_on_and_off_from_settings() {
 
     let status = access.set(false, port).await.unwrap();
     assert!(!status.running && status.link.is_none());
-    assert!(tokio::net::TcpStream::connect(("127.0.0.1", port))
-        .await
-        .is_err());
+    until_closed(port).await;
 
     // Turning it back on gives a new link; the old one never works again.
     let again = link_token(&access.set(true, port).await.unwrap());
@@ -458,15 +493,15 @@ async fn turns_on_and_off_from_settings() {
         401
     );
     // Moving it to another port keeps the link.
-    let moved = link_token(&access.set(true, free_port()).await.unwrap());
+    let moved = link_token(&turn_on(&access).await.1);
     assert_eq!(moved, again);
 }
 
 #[tokio::test]
 async fn reset_link_disconnects_the_old_link() {
     let (_d, access) = access();
-    let port = free_port();
-    let old = link_token(&access.set(true, port).await.unwrap());
+    let (port, status) = turn_on(&access).await;
+    let old = link_token(&status);
     let reset = access.reset_link().await.unwrap();
     assert!(reset.running, "{reset:?}");
     let new = link_token(&reset);
@@ -485,8 +520,8 @@ async fn reset_link_disconnects_the_old_link() {
 async fn ends_open_event_streams_when_stopped() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let (_d, access) = access();
-    let port = free_port();
-    let token = link_token(&access.set(true, port).await.unwrap());
+    let (port, status) = turn_on(&access).await;
+    let token = link_token(&status);
     let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port))
         .await
         .unwrap();
@@ -514,10 +549,8 @@ async fn ends_open_event_streams_when_stopped() {
 #[tokio::test]
 async fn reports_a_port_in_use_and_refuses_low_ports() {
     let (_d, access) = access();
-    // A port from `free_port`, which no other test here is given, below
-    // the range the system picks from for port 0 and for outgoing
-    // connections, so nothing else in the tests can take it between
-    // letting it go and binding it again below.
+    // A port from `free_port`, which no other test here is given, held
+    // straight away so the server finds it in use.
     let port = free_port();
     let taken = std::net::TcpListener::bind(("127.0.0.1", port)).unwrap();
     let status = access.set(true, port).await.unwrap();
@@ -534,21 +567,37 @@ async fn reports_a_port_in_use_and_refuses_low_ports() {
 
 #[tokio::test]
 async fn starts_again_on_the_next_launch() {
-    let d = tempfile::tempdir().unwrap();
-    let port = free_port();
-    let config = Config {
-        enabled: true,
-        port,
-    };
-    std::fs::write(
-        d.path().join(CONFIG_FILE),
-        serde_json::to_vec(&config).unwrap(),
-    )
-    .unwrap();
-    let engine = Engine::new(d.path().into(), |_| {}).unwrap();
-    let access = Access::new(engine, Hub::default(), d.path().into(), assets());
-    access.start().await;
-    assert!(access.status().await.running);
+    // As in `turn_on`, a port taken before Orbit binds it is swapped for
+    // another; anything else that keeps it from starting fails the test.
+    for _ in 0..20 {
+        let d = tempfile::tempdir().unwrap();
+        let port = free_port();
+        let config = Config {
+            enabled: true,
+            port,
+        };
+        std::fs::write(
+            d.path().join(CONFIG_FILE),
+            serde_json::to_vec(&config).unwrap(),
+        )
+        .unwrap();
+        let engine = Engine::new(d.path().into(), |_| {}).unwrap();
+        let access = Access::new(engine, Hub::default(), d.path().into(), assets());
+        access.start().await;
+        let status = access.status().await;
+        if status.running {
+            return;
+        }
+        let taken = format!("Port {port} is not available");
+        assert!(
+            status
+                .error
+                .as_deref()
+                .is_some_and(|e| e.starts_with(&taken)),
+            "{status:?}"
+        );
+    }
+    panic!("no free port in 20 tries");
 }
 
 #[test]
@@ -571,8 +620,7 @@ fn reads_the_tailnet_name() {
 async fn a_request_still_in_flight_does_not_hold_up_settings() {
     use tokio::io::AsyncWriteExt;
     let (_d, access) = access();
-    let port = free_port();
-    access.set(true, port).await.unwrap();
+    let (port, _) = turn_on(&access).await;
     // A browser part way through sending a request.
     let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", port))
         .await

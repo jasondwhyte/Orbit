@@ -30,11 +30,12 @@ fn text(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }
 /// A free port below the ephemeral range, as in `remote_tests.rs`, so no
-/// client connection takes it before the server listens.
+/// client connection takes it before the server listens. Ports stay under
+/// 32768, where Linux's ephemeral range starts by default.
 fn free_port() -> u16 {
     use std::sync::atomic::{AtomicU16, Ordering};
     static NEXT: AtomicU16 = AtomicU16::new(0);
-    let base = 30_000 + (std::process::id() % 500) as u16 * 20;
+    let base = 30_000 + (std::process::id() % 100) as u16 * 20;
     loop {
         let port = base + NEXT.fetch_add(1, Ordering::SeqCst) % 10_000;
         if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {

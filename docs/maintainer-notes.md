@@ -70,7 +70,7 @@ Before merging, merge the latest `master` into the branch and run the checks aga
 - Antigravity reviews have only run against the fake `agy`, never the real CLI; treat them as experimental. Its restrictions are documented, not changed.
 - Code signing for macOS and Windows.
 - The phone layout: repository setup might become desktop-only.
-- Flaky tests: `remote_tests.rs` port races (a port `free_port` let go gets taken by another test; passes on the next run) and `remote::tests::a_request_still_in_flight_does_not_hold_up_settings` (connection reset in cloud containers). A `held_port()` helper that keeps the listener bound was proposed, not made.
+- Flaky tests: `remote::tests::a_request_still_in_flight_does_not_hold_up_settings` (connection reset in cloud containers). CI has also failed now and then in `engine::cli_scans_tests`, `engine::checks_tests` and `claude::tests` on timing; not looked into yet.
 
 ## Testing and tooling gotchas
 
@@ -78,7 +78,7 @@ Before merging, merge the latest `master` into the branch and run the checks aga
 - Astryx Typeahead writes a picked choice's label into its input one frame later. Wait for `input.value` to equal the label before clearing or typing.
 - Astryx NumberInput renders an empty `role=alert`; App tests use a `banner()` helper.
 - The fake `gh` (`src-tauri/src/gh_fixture.cjs`) answers from files in its folder: `job-<id>.json` and `log-<id>.txt` for jobs (anything else is 404; an unknown endpoint answers `[]`), `history-<oid>.json`, `setup-<oid>.json`, runner files, `queued.json`, and `hold` to pause one read. Engine tests share one check link unless given distinct ones with the `links` helper in `engine/ops_tests.rs`.
-- `remote_tests.rs` hands each test its own port below the ephemeral range. A test that frees a port and binds again must take it from `free_port` and bind at once.
+- `remote_tests.rs` hands each test its own port below the ephemeral range, but a CI runner once gave one away to another connection anyway. Tests that turn browser access on use `turn_on`, which moves to another port when that happens, and wait with `until_closed` after turning it off, since stopping doesn't wait for the listener to close.
 - `src-tauri/target/debug/incremental` grows to about 13 GB and can fill a cloud disk; deleting it is safe.
 - Never `pkill -f` a pattern in the same shell command that contains it: it kills its own shell. Kill by process id.
 - The cloud clone is shallow; `git fetch --unshallow` before comparing releases.
