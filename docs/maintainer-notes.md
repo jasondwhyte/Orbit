@@ -15,7 +15,7 @@ Until Orbit takes the job over itself (see [Where Orbit is going](#where-orbit-i
 3. Non-blocking findings: decide whether to make each one, and say what you chose and why in a PR comment. Milo is a second opinion; the agent still makes the call.
 4. Each push starts a new review, so the cycle repeats.
 5. Merge only on Milo's **CLEAR TO MERGE**. While checks are still running Milo first posts **CODE REVIEW PASSED** and later edits the same comment to CLEAR TO MERGE; wait for the edit.
-6. A **BLOCKED** review means Milo's test machine is offline. Never merge on it: tell the user once that it needs reconnecting, and wait for the next review of the same head.
+6. A **BLOCKED** review means the review couldn't finish or a required step failed. Read its exact reasons and act on them: fix failing tests or a merge conflict yourself, and for a setup or access problem tell the user once what they need to do (for example, Milo's test machine is offline, or its harness points at an old address). Never merge while blocked; wait for the next review of the same head.
 7. Once cleared, the agent merges (squash) and moves on.
 
 Before merging, merge the latest `master` into the branch and run the checks again. GitHub's "can merge" and a review of the branch alone don't catch two pull requests that each pass but break together (two PRs once each grew the same fixed-size list, and `master` stopped compiling).

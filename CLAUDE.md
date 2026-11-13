@@ -71,7 +71,7 @@ Bump the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/C
 
 The background is in [docs/maintainer-notes.md](docs/maintainer-notes.md); read it before starting a larger piece of work. The short version:
 
-- **Review loop.** Mark a pull request ready when it's done and watch its comments. Milo, an outside review bot, posts findings: fix blocking ones and push; for non-blocking ones decide, and say what you chose and why in a PR comment. Each push starts a new review. Merge (squash) only on **CLEAR TO MERGE**, never on CODE REVIEW PASSED (it's edited to CLEAR TO MERGE once checks finish) or BLOCKED (Milo's test machine is offline: tell the user once and wait).
+- **Review loop.** Mark a pull request ready when it's done and watch its comments. Milo, an outside review bot, posts findings: fix blocking ones and push; for non-blocking ones decide, and say what you chose and why in a PR comment. Each push starts a new review. Merge (squash) only on **CLEAR TO MERGE**, never on CODE REVIEW PASSED (it's edited to CLEAR TO MERGE once checks finish) or BLOCKED. BLOCKED means the review couldn't finish: read its reasons, fix what's in the code (failing tests, a merge conflict), and for setup or access problems (such as Milo's test machine being offline) tell the user once exactly what's needed, then wait for the next review.
 - **Before merging**, merge the latest `master` into the branch and run the checks again.
 - **Orbit is public.** In anything that reaches the repository or GitHub, say "you" or "the user", never the maintainer's name, and leave out private machine names, paths and links.
 - **Never add a push guard**, in Orbit or in this repository.
