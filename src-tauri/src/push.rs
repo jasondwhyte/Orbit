@@ -22,7 +22,7 @@ use std::{path::Path, time::Duration};
 const KEY_FILE: &str = "push-key";
 /// Who sends the wake-ups, for a push service that needs to say something
 /// about them.
-const CONTACT: &str = "https://github.com/analogproblems/orbit";
+const CONTACT: &str = "https://github.com/jasondwhyte/Orbit";
 /// How long a push service keeps a wake-up for a device that's off.
 const KEEP: &str = "86400";
 /// The longest a push service's address may be.

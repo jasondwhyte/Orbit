@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in each Orbit release. Download the installers from the [Releases page](https://github.com/analogproblems/orbit/releases), and see the [user guide](docs/user-guide.md) for how each part works.
+What changed in each Orbit release. Download the installers from the [Releases page](https://github.com/jasondwhyte/Orbit/releases), and see the [user guide](docs/user-guide.md) for how each part works.
 
 ## 0.3.0
 

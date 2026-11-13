@@ -173,7 +173,7 @@ fn signs_each_wake_up_for_its_push_service() {
         serde_json::json!({
             "aud": "https://web.push.apple.com",
             "exp": 1_000_000 + 12 * 3600,
-            "sub": "https://github.com/analogproblems/orbit",
+            "sub": "https://github.com/jasondwhyte/Orbit",
         })
     );
     let signed = format!("{}.{}", parts[0], parts[1]);

@@ -1109,7 +1109,7 @@ From a fresh computer:
 
 1. Install [Tailscale](https://tailscale.com) and sign in with `tailscale up`.
 2. Install Node, Rust, Git, the GitHub CLI (`gh`) and your reviewer tools, so they are on your `PATH`. Run `claude` or `agy` once to sign in if you use them.
-3. Get Orbit's source with `git clone https://github.com/analogproblems/orbit`, and run `npm ci` in it.
+3. Get Orbit's source with `git clone https://github.com/jasondwhyte/Orbit`, and run `npm ci` in it.
 4. Run `npm run server -- install`. It builds Orbit, copies it and its browser page into a folder of their own (`~/.local/share/orbit-server` on Linux, `~/Library/Application Support/orbit-server` on macOS), sets up the service and starts it. It keeps your `PATH`, so the service finds `gh` and the reviewers, and says which of them it found.
 5. On Linux, if it says so, run `sudo loginctl enable-linger $USER` once. Without it, Linux stops your services when you log out and starts them only when you log in. On macOS, a launch agent runs while you're logged in, so keep the account logged in or turn on automatic login.
 6. Run `tailscale serve --bg 4317` once (or the port you chose), then the `link` command install shows, and open that link on your phone or laptop.
