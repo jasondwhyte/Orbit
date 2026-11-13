@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/analogproblems/orbit/releases/latest">Download</a> ·
+  <a href="https://github.com/jasondwhyte/Orbit/releases/latest">Download</a> ·
   <a href="CHANGELOG.md">What's new</a> ·
   <a href="docs/user-guide.md">User guide</a> ·
   <a href="docs/architecture.md">How it works</a>
@@ -100,7 +100,7 @@ npm install
 npm run dev   # then open http://127.0.0.1:1420
 ```
 
-**Install it.** Download the installer for your system from the [latest release](https://github.com/analogproblems/orbit/releases/latest): `.deb`, `.AppImage` or `.rpm` for Linux, `.dmg` for macOS (Apple silicon and Intel), and `.msi` or `.exe` for Windows. The macOS and Windows builds aren't signed yet: on macOS, open it once, then choose **Open Anyway** in **System Settings → Privacy & Security**; on Windows, choose **More info → Run anyway**.
+**Install it.** Download the installer for your system from the [latest release](https://github.com/jasondwhyte/Orbit/releases/latest): `.deb`, `.AppImage` or `.rpm` for Linux, `.dmg` for macOS (Apple silicon and Intel), and `.msi` or `.exe` for Windows. The macOS and Windows builds aren't signed yet: on macOS, open it once, then choose **Open Anyway** in **System Settings → Privacy & Security**; on Windows, choose **More info → Run anyway**.
 
 You'll also need, signed in:
 
@@ -136,4 +136,4 @@ npm run check     # everything the project checks before a change
 
 ## Contributing and license
 
-Bug reports and ideas are welcome as [issues](https://github.com/analogproblems/orbit/issues); [CONTRIBUTING.md](CONTRIBUTING.md) explains how. Please report security problems privately, as [SECURITY.md](SECURITY.md) describes. Orbit is released under the [Apache License 2.0](LICENSE).
+Bug reports and ideas are welcome as [issues](https://github.com/jasondwhyte/Orbit/issues); [CONTRIBUTING.md](CONTRIBUTING.md) explains how. Please report security problems privately, as [SECURITY.md](SECURITY.md) describes. Orbit is released under the [Apache License 2.0](LICENSE).

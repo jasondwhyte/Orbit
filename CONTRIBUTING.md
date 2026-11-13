@@ -4,7 +4,7 @@ Thanks for taking an interest in Orbit. It is a small project with one maintaine
 
 ## Reporting a problem or suggesting an idea
 
-Open an [issue](https://github.com/analogproblems/orbit/issues/new/choose) and pick the template that fits:
+Open an [issue](https://github.com/jasondwhyte/Orbit/issues/new/choose) and pick the template that fits:
 
 - **Bug report** for something that doesn't work as described in the [user guide](docs/user-guide.md).
 - **Idea** for something Orbit could do better.
