@@ -14,7 +14,7 @@ Until Orbit takes the job over itself (see [Where Orbit is going](#where-orbit-i
 2. Blocking findings: fix them and push.
 3. Non-blocking findings: decide whether to make each one, and say what you chose and why in a PR comment. Milo is a second opinion; the agent still makes the call.
 4. Each push starts a new review, so the cycle repeats.
-5. Merge only on Milo's **CLEAR TO MERGE**. While checks are still running Milo first posts **CODE REVIEW PASSED** and later edits the same comment to CLEAR TO MERGE; wait for the edit.
+5. Merge once CI is green and Milo says **CLEAR TO MERGE** or **CODE REVIEW PASSED**. Both clear it: CODE REVIEW PASSED means the code checks out but Milo didn't run the tests itself, and it isn't always edited to CLEAR TO MERGE afterwards, so don't wait for that.
 6. A **BLOCKED** review means the review couldn't finish or a required step failed. Read its exact reasons and act on them: fix failing tests or a merge conflict yourself, and for a setup or access problem tell the user once what they need to do (for example, Milo's test machine is offline, or its harness points at an old address). Never merge while blocked; wait for the next review of the same head.
 7. Once cleared, the agent merges (squash) and moves on.
 
@@ -106,8 +106,8 @@ Project instructions:
 - After opening a PR, mark it ready for review when it is done, and watch its comments (subscribe to PR activity).
 - Blocking findings: act on them and push the fix.
 - Non-blocking findings: decide whether to implement each one, and note the choice and the reason in a PR comment.
-- Each push restarts Milo's review, so the review/fix cycle repeats until Milo posts a "clear to merge" comment.
-- Once Milo says clear to merge, merge the PR yourself and move on to the next step.
+- Each push restarts Milo's review, so the review/fix cycle repeats until Milo posts CLEAR TO MERGE or CODE REVIEW PASSED.
+- Once CI is green and Milo says either one, merge the PR yourself and move on to the next step. Never merge on BLOCKED.
 - Never add a push guard: pushes should flow freely.
 - Read CLAUDE.md and docs/maintainer-notes.md first.
 ```
