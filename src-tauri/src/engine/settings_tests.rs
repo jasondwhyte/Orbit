@@ -1,5 +1,5 @@
 use super::{
-    settings::checkout_io, settings::matches_origin, settings::origin_of,
+    settings::checkout_io, settings::matches_origin, settings::remote_for,
     settings::validate_checkout, test_support::*, worktrees::git,
 };
 use crate::types::*;
@@ -227,9 +227,23 @@ async fn a_moved_repository_keeps_its_clone_and_former_names() {
     .unwrap();
     let mut moved = Repository::new("c/d", &repo.to_string_lossy());
     moved.former = vec!["a/b".into()];
-    assert!(origin_of("git@github.com:A/B.git", &moved));
-    assert!(origin_of("https://github.com/c/d", &moved));
-    assert!(!origin_of("https://github.com/a/b-two", &moved));
+    // A clone that names the old address is read from the new one, in the
+    // same form: another repository may have taken the old name since.
+    let remote = |origin: &str| remote_for(origin, &moved);
+    assert_eq!(
+        remote("git@github.com:A/B.git").as_deref(),
+        Some("git@github.com:c/d.git")
+    );
+    assert_eq!(
+        remote("https://github.com/a/b/").as_deref(),
+        Some("https://github.com/c/d")
+    );
+    assert_eq!(
+        remote("ssh://git@github.com/a/b").as_deref(),
+        Some("ssh://git@github.com/c/d")
+    );
+    assert_eq!(remote("https://github.com/c/D").as_deref(), Some("origin"));
+    assert_eq!(remote("https://github.com/a/b-two"), None);
     e.update(|s| s.settings.repositories.push(moved.clone()))
         .await;
     let mut edited = moved.clone();

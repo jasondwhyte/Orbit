@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    ops::Thread,
+    ops::{recover, Item, Posted, Thread},
     types::{pr_id, tests::pr, Repository, Review, Settings, Snapshot},
 };
 use serde_json::json;
@@ -105,7 +105,17 @@ fn watched() -> Snapshot {
         repo: "A/b".into(),
         pr_id: Some("a/b#1".into()),
         comment_id: Some(7),
-        posted: "Failing.\n<!-- orbit-ops thread=pr:a/b#1 {} -->".into(),
+        items: vec![Item {
+            number: 1,
+            failing: true,
+            since: "abc".into(),
+            ..Default::default()
+        }],
+        posted: concat!(
+            "Failing in A/b.\n<!-- orbit-ops thread=pr:a/b#1 ",
+            r#"{"repo":"A/b","items":[{"id":"I1","failing":true,"since":"abc"}]} -->"#
+        )
+        .into(),
         ..Default::default()
     });
     s.ops.push(Thread {
@@ -167,10 +177,14 @@ fn renames_the_repository_everywhere_in_the_state() {
     );
     assert_eq!(out.ops[0].tag(), crate::ops::tag("pr:a/b#1"));
     assert_eq!(out.ops[0].repo, "c/D");
+    // Its copy of what GitHub has stays as GitHub has it.
+    assert_eq!(out.ops[0].posted, s.ops[0].posted);
     // Nothing else holds the old name on its own.
     let mut saved = serde_json::to_value(&out).unwrap();
     for t in saved["ops"].as_array_mut().unwrap() {
-        t.as_object_mut().unwrap().remove("marked");
+        let t = t.as_object_mut().unwrap();
+        t.remove("marked");
+        t.remove("posted");
     }
     for r in saved["settings"]["repositories"].as_array_mut().unwrap() {
         r.as_object_mut().unwrap().remove("former");
@@ -180,12 +194,44 @@ fn renames_the_repository_everywhere_in_the_state() {
     let again = renamed(&out, "c/D", "e/f").unwrap();
     assert_eq!(again.settings.repositories[0].name, "e/f");
     assert_eq!(again.settings.repositories[0].former, ["A/b", "c/D"]);
-    // And moving back drops the name it has again.
-    let back = renamed(&again, "e/f", "a/B").unwrap();
-    assert_eq!(back.settings.repositories[0].former, ["c/D", "e/f"]);
     assert_eq!(again.ops[0].key, "pr:e/f#1");
     assert_eq!(again.ops[0].marker_key(), "pr:a/b#1");
     assert_eq!(again.ops[1].marker_key(), "pr:e/f#2");
+    // And moving back drops the name it has again.
+    let back = renamed(&again, "e/f", "a/B").unwrap();
+    assert_eq!(back.settings.repositories[0].former, ["c/D", "e/f"]);
+    // Moving away from the first name once more still keeps its first
+    // hidden line, though it names the repository again.
+    let away = renamed(&back, "a/B", "g/h").unwrap();
+    let keys: Vec<(&str, &str)> = away
+        .ops
+        .iter()
+        .map(|t| (t.key.as_str(), t.marker_key()))
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            ("pr:g/h#1", "pr:a/b#1"),
+            ("pr:g/h#2", "pr:g/h#2"),
+            ("pr:g/h#3", "pr:a/b#3"),
+        ]
+    );
+    assert_eq!(away.ops[0].posted, s.ops[0].posted);
+    // So Orbit still reads its comment on GitHub as its own.
+    let copy = Posted {
+        id: 7,
+        number: None,
+        url: String::new(),
+        updated_at: "2026-11-13T08:00:00Z".into(),
+        body: s.ops[0].posted.clone(),
+    };
+    let mut t = away.ops[0].clone();
+    recover(&mut t, &copy);
+    assert_eq!(t.items[0].heard_from, "2026-11-13T08:00:00Z");
+    let mut unmarked = away.ops[0].clone();
+    unmarked.marked = None;
+    recover(&mut unmarked, &copy);
+    assert_eq!(unmarked.items[0].heard_from, "");
 }
 
 #[test]

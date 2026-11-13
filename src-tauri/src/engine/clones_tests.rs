@@ -1,4 +1,8 @@
-use super::{clones::catch_up, test_support::*, worktrees::git};
+use super::{
+    clones::{catch_up, fast_forward},
+    test_support::*,
+    worktrees::git,
+};
 use crate::types::*;
 use std::path::{Path, PathBuf};
 
@@ -49,19 +53,42 @@ async fn fast_forwards_a_clean_clone_that_is_behind() {
     let (_d, upstream, clone) = cloned().await;
     commit(&upstream, "one").await;
     commit(&upstream, "two").await;
-    let (state, message) = catch_up(&clone).await.unwrap();
+    let (state, message) = catch_up(&clone, "origin").await.unwrap();
     assert_eq!(state, CloneUpdateState::Updated, "{message}");
     assert!(message.contains("by 2 commits"), "{message}");
     assert_eq!(head(&clone).await, head(&upstream).await);
-    let (state, _) = catch_up(&clone).await.unwrap();
+    let (state, _) = catch_up(&clone, "origin").await.unwrap();
     assert_eq!(state, CloneUpdateState::Current);
+}
+/// After `a/b` moved to `c/d`, a clone whose `origin` still names `a/b` is
+/// caught up from `c/d`: another repository may have taken the old name.
+#[tokio::test]
+async fn a_moved_clone_is_read_from_its_new_name() {
+    let (_d, upstream, clone) = cloned().await;
+    commit(&upstream, "one").await;
+    let url = |name: &str| format!("https://github.com/{name}.git");
+    git(&clone, &["remote", "set-url", "origin", &url("a/b")])
+        .await
+        .unwrap();
+    // `c/d` is the upstream on this computer. Nothing answers for `a/b`, so
+    // reading it would fail.
+    let instead = format!("url.{}.insteadOf", upstream.display());
+    git(&clone, &["config", &instead, &url("c/d")])
+        .await
+        .unwrap();
+    let mut moved = Repository::new("c/d", &clone.to_string_lossy());
+    assert!(fast_forward(&moved).await.is_err());
+    moved.former = vec!["a/b".into()];
+    let (state, message) = fast_forward(&moved).await.unwrap();
+    assert_eq!(state, CloneUpdateState::Updated, "{message}");
+    assert_eq!(head(&clone).await, head(&upstream).await);
 }
 #[tokio::test]
 async fn untracked_files_do_not_block_an_update() {
     let (_d, upstream, clone) = cloned().await;
     commit(&upstream, "one").await;
     std::fs::write(clone.join("notes.txt"), "mine").unwrap();
-    let (state, message) = catch_up(&clone).await.unwrap();
+    let (state, message) = catch_up(&clone, "origin").await.unwrap();
     assert_eq!(state, CloneUpdateState::Updated, "{message}");
     assert_eq!(
         std::fs::read_to_string(clone.join("notes.txt")).unwrap(),
@@ -75,7 +102,7 @@ async fn never_overwrites_an_ignored_local_file() {
     std::fs::write(clone.join("settings.local"), "mine").unwrap();
     commit(&upstream, "settings.local").await;
     let before = head(&clone).await;
-    let error = catch_up(&clone).await.unwrap_err();
+    let error = catch_up(&clone, "origin").await.unwrap_err();
     assert!(error.contains("Could not fast-forward"), "{error}");
     assert_eq!(head(&clone).await, before);
     assert_eq!(
@@ -89,7 +116,7 @@ async fn leaves_local_commits_alone() {
     commit(&upstream, "theirs").await;
     commit(&clone, "mine").await;
     let before = head(&clone).await;
-    let (state, message) = catch_up(&clone).await.unwrap();
+    let (state, message) = catch_up(&clone, "origin").await.unwrap();
     assert_eq!(state, CloneUpdateState::Skipped, "{message}");
     assert!(message.contains("1 local commit "), "{message}");
     assert_eq!(head(&clone).await, before);
@@ -98,11 +125,11 @@ async fn leaves_local_commits_alone() {
 async fn leaves_uncommitted_changes_alone() {
     let (_d, upstream, clone) = cloned().await;
     commit(&upstream, "shared").await;
-    catch_up(&clone).await.unwrap();
+    catch_up(&clone, "origin").await.unwrap();
     commit(&upstream, "theirs").await;
     std::fs::write(clone.join("shared"), "edited").unwrap();
     let before = head(&clone).await;
-    let (state, message) = catch_up(&clone).await.unwrap();
+    let (state, message) = catch_up(&clone, "origin").await.unwrap();
     assert_eq!(state, CloneUpdateState::Skipped, "{message}");
     assert!(message.contains("uncommitted changes"), "{message}");
     assert_eq!(head(&clone).await, before);
@@ -116,13 +143,13 @@ async fn skips_a_detached_head_and_a_branch_without_upstream() {
     let (_d, upstream, clone) = cloned().await;
     commit(&upstream, "theirs").await;
     git(&clone, &["checkout", "-q", "--detach"]).await.unwrap();
-    let (state, message) = catch_up(&clone).await.unwrap();
+    let (state, message) = catch_up(&clone, "origin").await.unwrap();
     assert_eq!(state, CloneUpdateState::Skipped);
     assert!(message.contains("not on a branch"), "{message}");
     git(&clone, &["checkout", "-q", "-b", "local-only"])
         .await
         .unwrap();
-    let (state, message) = catch_up(&clone).await.unwrap();
+    let (state, message) = catch_up(&clone, "origin").await.unwrap();
     assert_eq!(state, CloneUpdateState::Skipped);
     assert!(message.contains("does not track"), "{message}");
 }

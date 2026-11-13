@@ -1,7 +1,7 @@
 use super::{
     events::{ReviewEvent, TurnEnd},
     extras, findings, rounds,
-    settings::origin_of,
+    settings::remote_for,
     worktrees::git,
     worktrees::prune_orbit_refs,
     Engine,
@@ -117,12 +117,12 @@ impl Engine {
         {
             let _git = self.git_lock.lock().await;
             let origin = git(&cwd, &["remote", "get-url", "origin"]).await?;
-            if !origin_of(origin.trim(), &repo) {
+            let Some(remote) = remote_for(origin.trim(), &repo) else {
                 return Err(format!(
                     "Checkout origin does not match {}. Update its path in Repositories.",
                     pr.repo
                 ));
-            }
+            };
             self.live(id).await?;
             let reference = format!("refs/orbit/{id}");
             let added = async {
@@ -131,7 +131,7 @@ impl Engine {
                     &[
                         "fetch",
                         "--no-tags",
-                        "origin",
+                        &remote,
                         &format!("+refs/pull/{}/head:{reference}", pr.number),
                         &r.base_sha,
                     ],

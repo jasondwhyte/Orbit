@@ -11,9 +11,12 @@
 //!
 //! Some things keep their old text. A path is never rewritten, as the
 //! folders on this computer didn't move. A repository keeps its earlier
-//! names (`Repository::former`), as its clone's `origin` may still name one
-//! and GitHub sends that address on too. And a CI thread already on GitHub
-//! keeps the key its hidden line was posted with (`ops::Thread::marked`), so
+//! names (`Repository::former`), as its clone's `origin` may still name one;
+//! Orbit then reads the clone's repository from the same address with its
+//! current name (`engine::settings::remote_for`), as GitHub sends the old
+//! one on only until another repository takes that name. And a CI thread
+//! already on GitHub keeps the key its hidden line was posted with, through
+//! every later move (`ops::Thread::marked`), and Orbit's copy of its text, so
 //! Orbit still finds and edits its own comment or issue there.
 
 use crate::types::{same_repo, validate_repo, Snapshot};
@@ -108,19 +111,12 @@ pub fn rename_value(v: &mut Value, old: &str, new: &str) -> bool {
 }
 
 /// The state `s` with the repository `old` renamed `new` everywhere, as if
-/// it had always been called that, apart from paths and the hidden lines of
-/// what Orbit already posted. What isn't saved with the state is kept as
+/// it had always been called that, apart from paths and what Orbit already
+/// posted. What isn't saved with the state is kept as
 /// it was, or, for what Orbit only keeps between reads (such as a commit's
 /// checks by name), starts again as after a restart.
 pub fn renamed(s: &Snapshot, old: &str, new: &str) -> Result<Snapshot, String> {
     validate_repo(new)?;
-    // A thread on GitHub, or perhaps on it, keeps its hidden line.
-    let marked: Vec<(String, String)> = s
-        .ops
-        .iter()
-        .filter(|t| t.marked.is_none() && (t.is_posted() || t.unsure))
-        .filter_map(|t| Some((rename_text(&t.key, old, new)?, t.key.clone())))
-        .collect();
     let mut v = serde_json::to_value(s).map_err(|e| e.to_string())?;
     rename_value(&mut v, old, new);
     let mut out: Snapshot = serde_json::from_value(v).map_err(|e| e.to_string())?;
@@ -131,10 +127,14 @@ pub fn renamed(s: &Snapshot, old: &str, new: &str) -> Result<Snapshot, String> {
             r.extraction_problem = was.extraction_problem.clone();
         }
     }
-    for t in &mut out.ops {
-        if let Some((_, key)) = marked.iter().find(|(renamed, _)| *renamed == t.key) {
-            t.marked = Some(key.clone());
-        }
+    // A thread on GitHub, or perhaps on it, keeps its hidden line: the one
+    // it kept through an earlier move, or else the key it had before this
+    // one. Its copy of what GitHub has stays as GitHub has it.
+    for (t, was) in out.ops.iter_mut().zip(&s.ops) {
+        t.posted = was.posted.clone();
+        t.marked = was.marked.clone().or_else(|| {
+            (t.key != was.key && (was.is_posted() || was.unsure)).then(|| was.key.clone())
+        });
     }
     // The name as GitHub has it, wherever Orbit shows it, and the names a
     // repository had before, for its clone's `origin`.

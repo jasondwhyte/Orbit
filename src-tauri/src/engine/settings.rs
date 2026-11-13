@@ -309,12 +309,27 @@ pub async fn validate_checkout(
     )
     .await
 }
-/// Whether a clone's `origin` is this repository's, by its name or one it
-/// had before it moved.
-pub(super) fn origin_of(origin: &str, repo: &Repository) -> bool {
-    std::iter::once(&repo.name)
-        .chain(&repo.former)
-        .any(|name| matches_origin(origin, name))
+/// Where to fetch `repo` from in a clone whose `origin` is `origin`: the
+/// remote `origin` when it names the repository, or, when it names one the
+/// repository had before it moved, the same address with its current name.
+/// GitHub sends an old name on only until another repository takes it, so
+/// Orbit never fetches from one. None when `origin` is another repository's.
+pub(super) fn remote_for(origin: &str, repo: &Repository) -> Option<String> {
+    if matches_origin(origin, &repo.name) {
+        return Some("origin".into());
+    }
+    let former = repo
+        .former
+        .iter()
+        .find(|name| matches_origin(origin, name))?;
+    let origin = origin.trim_end_matches('/');
+    let (address, git) = match origin.strip_suffix(".git") {
+        Some(address) => (address, ".git"),
+        None => (origin, ""),
+    };
+    // `matches_origin` saw the old name end `address`, in ASCII.
+    let start = address.len().checked_sub(former.len())?;
+    Some(format!("{}{}{git}", address.get(..start)?, repo.name))
 }
 pub(super) fn matches_origin(origin: &str, repo: &str) -> bool {
     let origin = origin

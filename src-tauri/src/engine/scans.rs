@@ -1,6 +1,6 @@
 use super::{
     extras,
-    settings::origin_of,
+    settings::remote_for,
     worktrees::{git, prune_orbit_refs, remove_worktree},
     Engine,
 };
@@ -176,14 +176,14 @@ impl Engine {
         let (branch, commit) = {
             let _git = self.git_lock.lock().await;
             let origin = git(&cwd, &["remote", "get-url", "origin"]).await?;
-            if !origin_of(origin.trim(), &repo) {
+            let Some(remote) = remote_for(origin.trim(), &repo) else {
                 return Err(format!(
                     "Checkout origin does not match {}. Update its path in Repositories.",
                     scan.repo
                 ));
-            }
+            };
             // The remote's HEAD is its default branch.
-            let branch = git(&cwd, &["ls-remote", "--symref", "origin", "HEAD"])
+            let branch = git(&cwd, &["ls-remote", "--symref", &remote, "HEAD"])
                 .await
                 .ok()
                 .and_then(|out| {
@@ -196,12 +196,7 @@ impl Engine {
             let added = async {
                 git(
                     &cwd,
-                    &[
-                        "fetch",
-                        "--no-tags",
-                        "origin",
-                        &format!("+HEAD:{reference}"),
-                    ],
+                    &["fetch", "--no-tags", &remote, &format!("+HEAD:{reference}")],
                 )
                 .await?;
                 let commit = git(&cwd, &["rev-parse", &reference])
