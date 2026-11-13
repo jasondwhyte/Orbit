@@ -1,6 +1,6 @@
 use super::{
     extras,
-    settings::matches_origin,
+    settings::origin_of,
     worktrees::{git, prune_orbit_refs, remove_worktree},
     Engine,
 };
@@ -176,7 +176,7 @@ impl Engine {
         let (branch, commit) = {
             let _git = self.git_lock.lock().await;
             let origin = git(&cwd, &["remote", "get-url", "origin"]).await?;
-            if !matches_origin(origin.trim(), &scan.repo) {
+            if !origin_of(origin.trim(), &repo) {
                 return Err(format!(
                     "Checkout origin does not match {}. Update its path in Repositories.",
                     scan.repo

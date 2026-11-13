@@ -291,6 +291,9 @@ export interface Repository {
   /** Run a Claude or Antigravity review's setup and check commands in
    * Orbit's sandbox on this computer, while the dev container is off. */
   sandbox?: boolean;
+  /** Its names before it moved on GitHub, oldest first. Its clone's origin
+   * may still name one. */
+  former?: string[];
 }
 export interface DevContainer {
   enabled: boolean;
@@ -2765,6 +2768,9 @@ export interface OpsThread {
   /** Whether the pull request is clear to merge, as the top of its comment
    * says it, for one Orbit reviews automatically. */
   ready?: OpsReady;
+  /** The key its hidden line on GitHub carries, when it was posted before
+   * its repository moved. */
+  marked?: string;
 }
 /** The answer at the top of Orbit's comment on a pull request. */
 export interface OpsReady {

@@ -25,6 +25,7 @@ async fn claude_review(mode: &str) -> (tempfile::TempDir, Arc<Engine>, String, P
             provider: Provider::Claude,
             dev_container: Default::default(),
             sandbox: false,
+            former: vec![],
         });
         let mut review = Review::new(&pr, &s.settings, false);
         review.status = "preparing".into();
@@ -364,6 +365,7 @@ async fn state_saved_before_providers_restores_as_codex() {
         provider: Provider::Codex,
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     });
     let mut review = Review::new(&pr, &s.settings, false);
     review.status = "ready".into();

@@ -96,6 +96,10 @@ The clone's `origin` must match the configured GitHub repository. Accepted forms
 
 The clone does not need to be up to date. Each review fetches the PR head and base commit it needs into the clone, whatever branch is checked out.
 
+### When a repository moves on GitHub
+
+When a repository moves to another owner or is renamed on GitHub, GitHub sends its old address on to the new one, so Orbit keeps working. Orbit notices the move on its own, from an open pull request or by asking GitHub the repository's name once a day, and follows it to the new name: its reviews, loops, history, settings and Orbit's CI comments and issues carry on there, and Bit tells you. Your clone doesn't have to change. Orbit still accepts it while its `origin` names the old address, which GitHub also sends on. To point it at the new one, run `git remote set-url origin` with the new address in the clone. If you already connected the new name, Orbit disconnects the old one instead, so no pull request is reviewed twice.
+
 ### Keep the clone up to date
 
 Turn on **Keep this clone up to date** when the clone on disk drifts behind GitHub, for example because you mostly work elsewhere. After each sync (on the poll interval and after **Sync now**), Orbit runs `git fetch origin` in the clone and, when the checked-out branch is only behind the branch it tracks, fast-forwards it with `git merge --ff-only`. Git hooks are disabled for these commands.

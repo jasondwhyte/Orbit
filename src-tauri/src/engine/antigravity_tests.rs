@@ -89,6 +89,7 @@ async fn antigravity_review(mode: &str) -> Setup {
             provider: Provider::Antigravity,
             dev_container: Default::default(),
             sandbox: false,
+            former: vec![],
         });
         let mut review = Review::new(&pr, &s.settings, false);
         review.status = "preparing".into();

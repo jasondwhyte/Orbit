@@ -27,6 +27,7 @@ async fn engine(provider: Provider) -> (tempfile::TempDir, Arc<Engine>) {
             provider,
             dev_container: Default::default(),
             sandbox: false,
+            former: vec![],
         });
     })
     .await;

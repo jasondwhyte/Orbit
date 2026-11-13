@@ -68,6 +68,7 @@ pub(crate) fn snapshot(prs: Vec<PullRequest>, checks: &[(u64, CiState)]) -> Snap
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     });
     let pulls = checks
         .iter()

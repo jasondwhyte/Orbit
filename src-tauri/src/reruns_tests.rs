@@ -34,6 +34,7 @@ fn state(flaky: Option<&str>) -> Snapshot {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     });
     s.ci = vec![RepoCi {
         repo: "a/b".into(),

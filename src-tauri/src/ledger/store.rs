@@ -279,3 +279,62 @@ pub fn prune(root: &Path, connected: &[String]) -> Result<(), String> {
     }
     Ok(())
 }
+/// Moves the stored history of a repository that moved on GitHub from
+/// `old` to `new`, with `rewrite` applied to each stored file. A file
+/// already stored under the new name was read since the move, so it stays.
+/// The old folder goes once everything is across; until then, a read of
+/// `new` simply finds less of it and reads the rest from GitHub again.
+pub fn rename(
+    root: &Path,
+    old: &str,
+    new: &str,
+    rewrite: &dyn Fn(&mut Value),
+) -> Result<(), String> {
+    let from = repo_dir(root, old)?;
+    let to = repo_dir(root, new)?;
+    if from == to || !from.is_dir() {
+        return Ok(());
+    }
+    copy_rewritten(&from, &to, rewrite)?;
+    std::fs::remove_dir_all(&from).map_err(|e| e.to_string())?;
+    if let Some(owner) = from.parent() {
+        // Only when nothing else of that owner is stored.
+        let _ = std::fs::remove_dir(owner);
+    }
+    Ok(())
+}
+fn copy_rewritten(from: &Path, to: &Path, rewrite: &dyn Fn(&mut Value)) -> Result<(), String> {
+    std::fs::create_dir_all(to).map_err(|e| e.to_string())?;
+    for entry in std::fs::read_dir(from)
+        .map_err(|e| e.to_string())?
+        .flatten()
+    {
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        let target = to.join(entry.file_name());
+        // Never follows a link out of Orbit's folder.
+        if kind.is_dir() {
+            copy_rewritten(&entry.path(), &target, rewrite)?;
+            continue;
+        }
+        let path = entry.path();
+        if !kind.is_file()
+            || target.exists()
+            || path.extension().and_then(|e| e.to_str()) != Some("json")
+        {
+            continue;
+        }
+        // One that can't be read is read from GitHub again.
+        let Some(mut v) = std::fs::read(&path)
+            .ok()
+            .and_then(|data| serde_json::from_slice::<Value>(&data).ok())
+        else {
+            continue;
+        };
+        rewrite(&mut v);
+        let data = serde_json::to_vec(&v).map_err(|e| e.to_string())?;
+        let temp = to.join(format!("{}.tmp", entry.file_name().to_string_lossy()));
+        std::fs::write(&temp, data).map_err(|e| e.to_string())?;
+        std::fs::rename(&temp, &target).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}

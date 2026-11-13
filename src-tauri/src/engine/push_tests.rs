@@ -31,6 +31,7 @@ fn repository() -> Repository {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     }
 }
 fn review(status: &str) -> Review {

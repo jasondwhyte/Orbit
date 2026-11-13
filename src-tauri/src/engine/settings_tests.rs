@@ -1,6 +1,6 @@
 use super::{
-    settings::checkout_io, settings::matches_origin, settings::validate_checkout, test_support::*,
-    worktrees::git,
+    settings::checkout_io, settings::matches_origin, settings::origin_of,
+    settings::validate_checkout, test_support::*, worktrees::git,
 };
 use crate::types::*;
 use std::time::Duration;
@@ -86,25 +86,32 @@ async fn validates_checkout_origin_and_canonical_root_without_setup() {
     .unwrap();
     let child = repo.join("nested");
     std::fs::create_dir(&child).unwrap();
-    let canonical = validate_checkout("A/B", child.to_str().unwrap())
+    let canonical = validate_checkout("A/B", &[], child.to_str().unwrap())
         .await
         .unwrap();
     assert_eq!(canonical, repo.canonicalize().unwrap().to_string_lossy());
-    assert!(validate_checkout("a/c", repo.to_str().unwrap())
+    assert!(validate_checkout("a/c", &[], repo.to_str().unwrap())
         .await
         .is_err());
-    assert!(validate_checkout("a/b", "relative").await.is_err());
+    // A clone of the name a repository had before it moved is its clone.
+    let former = ["x/y".to_string(), "A/B".to_string()];
+    assert!(validate_checkout("a/c", &former, repo.to_str().unwrap())
+        .await
+        .is_ok());
+    assert!(validate_checkout("a/b", &[], "relative").await.is_err());
     let plain = tempfile::tempdir().unwrap();
-    assert!(validate_checkout("a/b", plain.path().to_str().unwrap())
-        .await
-        .is_err());
+    assert!(
+        validate_checkout("a/b", &[], plain.path().to_str().unwrap())
+            .await
+            .is_err()
+    );
     git(
         &repo,
         &["remote", "set-url", "origin", "https://example.com/a/b.git"],
     )
     .await
     .unwrap();
-    assert!(validate_checkout("a/b", repo.to_str().unwrap())
+    assert!(validate_checkout("a/b", &[], repo.to_str().unwrap())
         .await
         .is_err());
 }
@@ -125,6 +132,7 @@ async fn partial_settings_are_atomic_and_unavailable_checkouts_do_not_block_edit
             provider: Default::default(),
             dev_container: Default::default(),
             sandbox: false,
+            former: vec![],
         });
     })
     .await;
@@ -189,6 +197,7 @@ async fn repository_save_validates_and_keeps_other_settings() {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     };
     e.save_repository(config.clone(), None).await.unwrap();
     assert_eq!(
@@ -202,6 +211,44 @@ async fn repository_save_validates_and_keeps_other_settings() {
         .await
         .is_err());
     assert_eq!(e.snapshot().await.settings.repositories[0].name, "a/b");
+}
+/// A repository that moved on GitHub keeps its clone, whose `origin` still
+/// names the old address, and the names it had, though the app doesn't send
+/// them when you change its settings.
+#[tokio::test]
+async fn a_moved_repository_keeps_its_clone_and_former_names() {
+    let (_d, e, _) = running_engine().await;
+    let (_repo_dir, repo) = git_repo().await;
+    git(
+        &repo,
+        &["remote", "add", "origin", "https://github.com/a/b.git"],
+    )
+    .await
+    .unwrap();
+    let mut moved = Repository::new("c/d", &repo.to_string_lossy());
+    moved.former = vec!["a/b".into()];
+    assert!(origin_of("git@github.com:A/B.git", &moved));
+    assert!(origin_of("https://github.com/c/d", &moved));
+    assert!(!origin_of("https://github.com/a/b-two", &moved));
+    e.update(|s| s.settings.repositories.push(moved.clone()))
+        .await;
+    let mut edited = moved.clone();
+    edited.former.clear();
+    edited.automatic = true;
+    edited.path = repo.join(".").to_string_lossy().into();
+    e.save_repository(edited, Some("c/d".into())).await.unwrap();
+    let saved = e.snapshot().await.settings.repositories[0].clone();
+    assert!(saved.automatic);
+    assert_eq!(saved.former, ["a/b"]);
+    assert_eq!(saved.path, repo.canonicalize().unwrap().to_string_lossy());
+    // Another repository in its place has none of them.
+    let mut other = saved.clone();
+    other.name = "e/f".into();
+    assert!(e
+        .save_repository(other, Some("c/d".into()))
+        .await
+        .unwrap_err()
+        .contains("does not match e/f"));
 }
 #[tokio::test]
 async fn slow_checkout_filesystem_work_does_not_block_the_runtime_or_wait_forever() {

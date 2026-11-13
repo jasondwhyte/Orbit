@@ -1234,6 +1234,26 @@ mod say {
             _ => format!("{repo} is connected! Here's what I'd set up next:"),
         }
     }
+    /// A repository Orbit follows to where it moved on GitHub, or stops
+    /// watching under its old name when it watches the new one already.
+    pub fn moved(tone: &str, old: &str, new: &str, already: bool) -> String {
+        match (tone, already) {
+            ("calm", false) => format!(
+                "{old} moved to {new} on GitHub. Orbit uses the new name now, and its reviews, history and settings came along."
+            ),
+            ("dry", false) => format!("{old} is {new} now. Moved everything over."),
+            (_, false) => format!(
+                "{old} moved to {new} on GitHub! I followed it there, with its reviews, history and settings."
+            ),
+            ("calm", true) => format!(
+                "{old} moved to {new} on GitHub, which you already watch, so Orbit stopped watching {old}."
+            ),
+            ("dry", true) => format!("{old} is {new} now, which you already watch. Dropped {old}."),
+            (_, true) => format!(
+                "{old} moved to {new} on GitHub, and you already watch {new}, so I stopped watching {old}."
+            ),
+        }
+    }
     /// A decision waiting on a pull request, from its write-up.
     pub fn decide(tone: &str, pr: &str, text: &str) -> String {
         let text = text.trim();
@@ -1942,6 +1962,22 @@ pub fn ask(s: &mut Snapshot, question: Question, lookups: &crate::ask::Lookups) 
             lines,
             proposals,
             ..Note::new(NoteKind::Answer, text)
+        }],
+    );
+}
+/// Notes that the repository `old` moved to `new` on GitHub, while Bit is
+/// on: Orbit followed it, or, when `already` watching `new`, stopped
+/// watching `old`.
+pub fn moved(s: &mut Snapshot, old: &str, new: &str, already: bool) {
+    if !s.settings.buddy.enabled {
+        return;
+    }
+    let text = say::moved(&s.settings.buddy.tone, old, new, already);
+    append(
+        &mut s.buddy_feed,
+        vec![Note {
+            repo: Some(new.into()),
+            ..Note::new(NoteKind::Connected, text)
         }],
     );
 }

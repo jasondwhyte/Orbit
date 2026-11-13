@@ -1024,6 +1024,7 @@ fn releasing() -> Snapshot {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     });
     let draft = |id: u64, tag: &str| Release {
         id,

@@ -30,6 +30,7 @@ fn repository(automatic: bool) -> Repository {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     }
 }
 /// A pull request Orbit trusts, opened against main's latest commit.

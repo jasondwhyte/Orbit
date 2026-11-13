@@ -1,7 +1,7 @@
 use super::{
     events::{ReviewEvent, TurnEnd},
     extras, findings, rounds,
-    settings::matches_origin,
+    settings::origin_of,
     worktrees::git,
     worktrees::prune_orbit_refs,
     Engine,
@@ -117,7 +117,7 @@ impl Engine {
         {
             let _git = self.git_lock.lock().await;
             let origin = git(&cwd, &["remote", "get-url", "origin"]).await?;
-            if !matches_origin(origin.trim(), &pr.repo) {
+            if !origin_of(origin.trim(), &repo) {
                 return Err(format!(
                     "Checkout origin does not match {}. Update its path in Repositories.",
                     pr.repo

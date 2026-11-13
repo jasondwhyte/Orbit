@@ -146,8 +146,16 @@ pub struct Thread {
     /// The kind of security alert its issue is about, for one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<Source>,
+    /// The key its hidden line on GitHub carries, when that isn't `key`:
+    /// it was posted before its repository moved (`crate::repo_moves`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub marked: Option<String>,
 }
 impl Thread {
+    /// The key its hidden line on GitHub carries.
+    pub fn marker_key(&self) -> &str {
+        self.marked.as_deref().unwrap_or(&self.key)
+    }
     /// Whether it is on GitHub.
     pub fn is_posted(&self) -> bool {
         match self.kind {
@@ -158,7 +166,7 @@ impl Thread {
     /// The hidden line that marks Orbit's comment or issue for this
     /// thread, followed by its items as JSON.
     pub fn tag(&self) -> String {
-        tag(&self.key)
+        tag(self.marker_key())
     }
 }
 /// Whether a pull request is clear to merge, as the top of its comment says
@@ -1147,7 +1155,7 @@ pub fn recover(t: &mut Thread, copy: &Posted) {
     if copy.updated_at.is_empty() {
         return;
     }
-    let on_github = failing_in(&copy.body, &t.key);
+    let on_github = failing_in(&copy.body, t.marker_key());
     let failing = t.items.iter_mut().filter(|i| i.failing);
     for item in failing.filter(|i| i.heard_from.is_empty()) {
         if on_github.contains(&(item.number, item.since.clone())) {
@@ -1429,7 +1437,7 @@ pub fn next(
                 let closed_at = p.closed_at.clone().unwrap_or_default();
                 if t.noted.as_deref() != Some(closed_at.as_str()) {
                     return Some(Planned {
-                        marker: note_tag(&t.key, &closed_at),
+                        marker: note_tag(t.marker_key(), &closed_at),
                         closed_at: Some(closed_at),
                         ..plan(Action::NoteOnIssue, closing_note(t, p))
                     });
@@ -2508,7 +2516,7 @@ pub fn closing_note(t: &Thread, p: &Problem) -> String {
             p.closed_reason.as_deref().unwrap_or_default()
         )
     };
-    format!("{text}\n\n{}", note_tag(&t.key, closed_at))
+    format!("{text}\n\n{}", note_tag(t.marker_key(), closed_at))
 }
 
 /// Writes left on their way to GitHub when Orbit stopped: GitHub may or may

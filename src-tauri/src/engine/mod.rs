@@ -35,6 +35,7 @@ mod prune;
 mod publish;
 mod push;
 mod queue;
+mod repo_moves;
 mod rounds;
 mod run;
 mod scans;
@@ -102,6 +103,8 @@ mod push_tests;
 #[cfg(test)]
 mod queue_tests;
 #[cfg(test)]
+mod repo_moves_tests;
+#[cfg(test)]
 mod rounds_tests;
 #[cfg(test)]
 mod run_tests;
@@ -144,8 +147,9 @@ type Notifier = Box<dyn Fn(&crate::attention::Notice) + Send + Sync>;
 /// plain-language write-ups), `watch` (reading CI), `ops` (Orbit's
 /// comments and issues about failing CI), `security_settings` (each
 /// repository's security settings, and changing one on your tap),
-/// `dependabot` (whether Dependabot's pull requests can merge) and
-/// `moving` (moving into an always-on Orbit).
+/// `dependabot` (whether Dependabot's pull requests can merge),
+/// `moving` (moving into an always-on Orbit) and `repo_moves` (following a
+/// repository that moved on GitHub).
 ///
 /// # Locks
 ///
@@ -178,10 +182,12 @@ type Notifier = Box<dyn Fn(&crate::attention::Notice) + Send + Sync>;
 /// (`set_up_repository`); `rebasing` → `state` (`ask_rebase`, `read_updates`); `tagging` → `state` (`push_tag`, `publish_release`, `read_releases`); `poll_lock` → `publish_lock` → `cloning` → `rebasing` → `tagging`, the last two let go at once (`fence`); `poll_lock` → `cloning` → `state` (`take_in`); `poll_lock` →
 /// `publish_lock` → `state`, held for good once the Orbit moves (`fence`); `state` → `synced_repos`
 /// (`schedule`); `state` → `taking_in` (`take_in`, `move_status`); `state` → `fixing` (`flush`); `state` → `wake_retry` (`wake_devices`, `woken`, `push_notices`, `remove_push_device`); `state` → `asking`
-/// (`ask_buddy_anything`); `state` → `using` (`use_proposal`). `preparing`,
-/// `recovered_publications`, `status_sender`, `sending_statuses`,
-/// `boxes` and `stopping_scans` (`std` mutexes, like `preparing` and `fixing`) are
-/// otherwise only taken on their own.
+/// (`ask_buddy_anything`); `state` → `using` (`use_proposal`). Following a
+/// moved repository takes `poll_lock` → `publish_lock` → `cloning` →
+/// `rebasing` → `tagging` → `state`, like `fence`. `preparing`,
+/// `recovered_publications`, `status_sender`, `sending_statuses`, `boxes`,
+/// `names_read` and `stopping_scans` (`std` mutexes, like `preparing` and
+/// `fixing`) are otherwise only taken on their own.
 ///
 /// Known exception: `clean_worktrees_with` briefly holds a `git_lock` try-lock
 /// guard while it try-locks `cleanup_lock`, the reverse of `cleanup_lock` →
@@ -336,6 +342,9 @@ pub struct Engine {
     /// The Codex sign-in Bit started, until Codex says it finished.
     codex_login: std::sync::Mutex<Option<sign_in::Waiting>>,
     cloning: Mutex<()>,
+    /// When Orbit last asked GitHub each repository's name, by lowercased
+    /// name, to see whether it moved (`repo_moves`).
+    names_read: std::sync::Mutex<HashMap<String, std::time::Instant>>,
     _instance_lock: std::fs::File,
 }
 impl Engine {
@@ -434,6 +443,7 @@ impl Engine {
             signing_in: std::sync::Mutex::new(HashSet::new()),
             codex_login: std::sync::Mutex::new(None),
             cloning: Mutex::new(()),
+            names_read: std::sync::Mutex::new(HashMap::new()),
             _instance_lock: instance_lock,
         }))
     }

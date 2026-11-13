@@ -39,6 +39,7 @@ fn snapshot() -> (Snapshot, PullRequest) {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     });
     s.prs.push(p.clone());
     (s, p)
