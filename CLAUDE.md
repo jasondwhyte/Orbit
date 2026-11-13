@@ -25,7 +25,7 @@ npm run server     # Orbit without a window (orbit-server), serving the browser 
 
 - `src/`: React 19 + TypeScript + Zustand. `store.ts` holds state and `action(command, args)`, which goes to Tauri `invoke` on the desktop, to `/api/<command>` in a browser using remote access (`remote.ts`), or to `demoAction` in the browser demo. `types.ts` mirrors the Rust types.
 - `src-tauri/src/`: the Rust side. `lib.rs` is the Tauri command allowlist and lifecycle; `server.rs` (with `bin/orbit-server.rs`) runs the engine with no window, for a computer that stays on, `service.rs` sets it up as a systemd user service or launch agent, `client.rs` lets the desktop app show that Orbit instead of running its own, and `moving.rs` says what moves there with **Move to it**; `engine/` is the engine, one file per area (see the doc comment on `Engine` in `engine/mod.rs`); top-level files hold logic that doesn't need the engine (reviewer CLIs, GitHub, review loop, Bit, ledger, scans, remote access).
-- `docs/user-guide.md` (every control and rule, for users), `docs/architecture.md` (how it works inside, with a [code map](docs/architecture.md#code-map)), `docs/screenshots/` (README images, taken from the browser demo).
+- `docs/user-guide.md` (every control and rule, for users), `docs/architecture.md` (how it works inside, with a [code map](docs/architecture.md#code-map)), `docs/design-overview.md` (a plain-language tour, with every place a model is called), `docs/maintainer-notes.md` (how work flows, decisions and why, what's still open, testing gotchas), `docs/screenshots/` (README images, taken from the browser demo).
 - `test-fixtures/`: JSON lists shared by both sides (Bit's options, finding categories, report labels) and copies of real PR comments for the ledger parsers.
 - `.claude/skills/answer-orbit-reviews/`: the skill Orbit hands to authors' agents. Tests parse its examples with the real reply parser, so edit it and `engine/claims.rs` together.
 
@@ -66,3 +66,14 @@ A command is wired in four places, and missing one fails in only one mode:
 ## Releases
 
 Bump the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` (plus their lockfiles, `package-lock.json` and `src-tauri/Cargo.lock`), add the release's notes to `CHANGELOG.md` under `## X.Y.Z`, merge, then tag `master` as `vX.Y.Z` and push the tag. `.github/workflows/release.yml` checks the versions match and builds a draft release for Linux, macOS and Windows that starts with those notes. Details are in [CONTRIBUTING.md](CONTRIBUTING.md#making-a-release).
+
+## How work flows here
+
+The background is in [docs/maintainer-notes.md](docs/maintainer-notes.md); read it before starting a larger piece of work. The short version:
+
+- **Review loop.** Mark a pull request ready when it's done and watch its comments. Milo, an outside review bot, posts findings: fix blocking ones and push; for non-blocking ones decide, and say what you chose and why in a PR comment. Each push starts a new review. Merge (squash) only on **CLEAR TO MERGE**, never on CODE REVIEW PASSED (it's edited to CLEAR TO MERGE once checks finish) or BLOCKED. BLOCKED means the review couldn't finish: read its reasons, fix what's in the code (failing tests, a merge conflict), and for setup or access problems (such as Milo's test machine being offline) tell the user once exactly what's needed, then wait for the next review.
+- **Before merging**, merge the latest `master` into the branch and run the checks again.
+- **Orbit is public.** In anything that reaches the repository or GitHub, say "you" or "the user", never the maintainer's name, and leave out private machine names, paths and links.
+- **Never add a push guard**, in Orbit or in this repository.
+- **Orbit is meant to replace Milo**, so don't design around an outside reviewer staying.
+- **Cloud sessions can't push tags, delete branches or force-push.** The user tags releases; after a merge, reset the branch to `master` and push normally.
