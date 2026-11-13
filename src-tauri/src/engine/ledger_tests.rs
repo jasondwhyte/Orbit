@@ -288,6 +288,7 @@ fn repository(name: &str) -> Repository {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     }
 }
 /// A stand-in for `gh` answering each endpoint from a file named after it,

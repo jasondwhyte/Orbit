@@ -26,7 +26,8 @@ pub mod writeup;
 pub use assemble::derive;
 pub use narrative::parse as parse_narrative;
 pub use store::{
-    from_github, load, load_repo, load_writeups, prune, save, save_writeup, stored_path, REVISIONS,
+    from_github, load, load_repo, load_writeups, prune, rename, save, save_writeup, stored_path,
+    REVISIONS,
 };
 
 #[cfg(test)]

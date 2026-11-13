@@ -92,7 +92,7 @@ impl Engine {
                 folder.display()
             )
         };
-        let path = validate_checkout(name, &folder.to_string_lossy())
+        let path = validate_checkout(name, &[], &folder.to_string_lossy())
             .await
             .map_err(not_connected)?;
         let mut repository = Repository::new(name, &path);

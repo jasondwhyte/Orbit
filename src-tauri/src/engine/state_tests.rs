@@ -59,6 +59,7 @@ async fn merges_case_duplicate_repositories_saved_by_older_versions() {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     };
     let mut upper = crate::types::tests::pr();
     upper.id = "A/B#1".into();

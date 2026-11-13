@@ -1,4 +1,4 @@
-use super::{settings::matches_origin, worktrees::git, Engine};
+use super::{settings::remote_for, worktrees::git, Engine};
 use crate::types::*;
 use std::{
     path::Path,
@@ -30,7 +30,7 @@ impl Engine {
         for repo in &repos {
             let (state, message) = {
                 let _git = self.git_lock.lock().await;
-                match fast_forward(Path::new(&repo.path), &repo.name).await {
+                match fast_forward(repo).await {
                     Ok(done) => done,
                     Err(e) => (CloneUpdateState::Failed, e),
                 }
@@ -65,26 +65,44 @@ impl Engine {
     }
 }
 
-/// Fetches `origin` and fast-forwards the checked-out branch to its upstream
-/// when the clone has no local commits or uncommitted changes to tracked files.
-pub(super) async fn fast_forward(
-    path: &Path,
-    repo: &str,
-) -> Result<(CloneUpdateState, String), String> {
-    let cwd = std::fs::canonicalize(path).map_err(|e| format!("Cannot access checkout: {e}"))?;
+/// Fetches the repository and fast-forwards the checked-out branch to its
+/// upstream when the clone has no local commits or uncommitted changes to
+/// tracked files.
+pub(super) async fn fast_forward(repo: &Repository) -> Result<(CloneUpdateState, String), String> {
+    let cwd =
+        std::fs::canonicalize(&repo.path).map_err(|e| format!("Cannot access checkout: {e}"))?;
     let origin = git(&cwd, &["remote", "get-url", "origin"]).await?;
-    if !matches_origin(origin.trim(), repo) {
+    let Some(remote) = remote_for(origin.trim(), repo) else {
         return Err(format!(
-            "Checkout origin does not match {repo}. Update its path in Repositories."
+            "Checkout origin does not match {}. Update its path in Repositories.",
+            repo.name
         ));
-    }
-    catch_up(&cwd).await
+    };
+    catch_up(&cwd, &remote).await
 }
 
-/// The part of `fast_forward` after the origin check.
-pub(super) async fn catch_up(cwd: &Path) -> Result<(CloneUpdateState, String), String> {
+/// The part of `fast_forward` after the origin check: fetches `remote` into
+/// `origin`'s branches, so an `origin` with the name a repository had before
+/// it moved is read from its current name.
+pub(super) async fn catch_up(
+    cwd: &Path,
+    remote: &str,
+) -> Result<(CloneUpdateState, String), String> {
     let cwd = cwd.to_path_buf();
-    git(&cwd, &["fetch", "--no-tags", "origin"]).await?;
+    if remote == "origin" {
+        git(&cwd, &["fetch", "--no-tags", "origin"]).await?;
+    } else {
+        git(
+            &cwd,
+            &[
+                "fetch",
+                "--no-tags",
+                remote,
+                "+refs/heads/*:refs/remotes/origin/*",
+            ],
+        )
+        .await?;
+    }
     let skipped = |why: String| Ok((CloneUpdateState::Skipped, why));
     let Ok(branch) = git(&cwd, &["symbolic-ref", "--quiet", "--short", "HEAD"]).await else {
         return skipped("Not updated: the clone is not on a branch.".into());

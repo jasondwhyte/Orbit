@@ -39,6 +39,7 @@ fn repo() -> Snapshot {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     });
     let draft = Release {
         name: "Orbit 0.3.0".into(),

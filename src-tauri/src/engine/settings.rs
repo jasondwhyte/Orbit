@@ -176,8 +176,26 @@ impl Engine {
                     !same_repo(&old.name, &repository.name) || old.path != repository.path
                 })
         };
+        // The names a repository had before it moved stay with it, as the
+        // app doesn't send them.
+        let former = {
+            let s = self.state.lock().await;
+            original
+                .as_ref()
+                .and_then(|name| {
+                    s.settings
+                        .repositories
+                        .iter()
+                        .find(|r| same_repo(&r.name, name))
+                })
+                .filter(|old| same_repo(&old.name, &repository.name))
+                .map(|old| old.former.clone())
+                .unwrap_or_default()
+        };
+        repository.former = former;
         if validate {
-            repository.path = validate_checkout(&repository.name, &repository.path).await?;
+            repository.path =
+                validate_checkout(&repository.name, &repository.former, &repository.path).await?;
         }
         let mut s = self.state.lock().await;
         let mut settings = s.settings.clone();
@@ -238,7 +256,13 @@ pub(super) async fn checkout_io<T: Send + 'static>(
         })?
         .map_err(|e| format!("Checkout filesystem check failed: {e}"))?
 }
-pub async fn validate_checkout(repo: &str, path: &str) -> Result<String, String> {
+/// The clone at `path`, after checking it's a clone of `repo`, by its name
+/// or one in `former` that it had before it moved.
+pub async fn validate_checkout(
+    repo: &str,
+    former: &[String],
+    path: &str,
+) -> Result<String, String> {
     validate_repo(repo)?;
     if !Path::new(path).is_absolute() {
         return Err("Use an absolute checkout path.".into());
@@ -269,7 +293,8 @@ pub async fn validate_checkout(repo: &str, path: &str) -> Result<String, String>
                 .to_string()
         })?;
     let origin = read(vec!["remote".into(), "get-url".into(), "origin".into()]).await?;
-    if !matches_origin(origin.trim(), repo) {
+    let named = |name: &String| matches_origin(origin.trim(), name);
+    if !matches_origin(origin.trim(), repo) && !former.iter().any(named) {
         return Err(format!(
             "Checkout origin does not match {repo}. Choose its matching clone."
         ));
@@ -283,6 +308,28 @@ pub async fn validate_checkout(repo: &str, path: &str) -> Result<String, String>
         Duration::from_secs(10),
     )
     .await
+}
+/// Where to fetch `repo` from in a clone whose `origin` is `origin`: the
+/// remote `origin` when it names the repository, or, when it names one the
+/// repository had before it moved, the same address with its current name.
+/// GitHub sends an old name on only until another repository takes it, so
+/// Orbit never fetches from one. None when `origin` is another repository's.
+pub(super) fn remote_for(origin: &str, repo: &Repository) -> Option<String> {
+    if matches_origin(origin, &repo.name) {
+        return Some("origin".into());
+    }
+    let former = repo
+        .former
+        .iter()
+        .find(|name| matches_origin(origin, name))?;
+    let origin = origin.trim_end_matches('/');
+    let (address, git) = match origin.strip_suffix(".git") {
+        Some(address) => (address, ".git"),
+        None => (origin, ""),
+    };
+    // `matches_origin` saw the old name end `address`, in ASCII.
+    let start = address.len().checked_sub(former.len())?;
+    Some(format!("{}{}{git}", address.get(..start)?, repo.name))
 }
 pub(super) fn matches_origin(origin: &str, repo: &str) -> bool {
     let origin = origin

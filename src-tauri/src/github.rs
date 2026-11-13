@@ -257,6 +257,17 @@ pub async fn open_pulls(repo: &str, login: &str) -> Result<Vec<PullRequest>, Str
         .map(|item| parse_pull(item, repo, login))
         .collect()
 }
+/// The repository's name as GitHub has it now, which differs from `repo`
+/// once it moved: GitHub answers for the old name from the new one.
+pub async fn full_name(repo: &str) -> Result<String, String> {
+    validate_repo(repo)?;
+    let v = api(&format!("repos/{repo}"), "GET", &[], None).await?;
+    v["full_name"]
+        .as_str()
+        .filter(|name| validate_repo(name).is_ok())
+        .map(str::to_owned)
+        .ok_or_else(|| "GitHub didn't say the repository's name.".into())
+}
 /// Collects up to ten pages of 100 items. Ten full pages are only complete when
 /// an eleventh page is empty.
 async fn list_pages<F, Fut>(fetch: F) -> Result<Vec<Value>, String>

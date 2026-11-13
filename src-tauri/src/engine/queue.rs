@@ -41,10 +41,14 @@ impl Engine {
             let mut prs = vec![];
             let mut synced = HashSet::new();
             let mut failed = vec![];
+            let mut moves = vec![];
             // Sequential requests respect GitHub secondary rate limits.
             for repo in &repos {
                 match sync_repo(repo, &login, &previous).await {
                     Ok(found) => {
+                        if let Some(to) = super::repo_moves::moved_to(repo, &found) {
+                            moves.push((repo.clone(), to));
+                        }
                         prs.extend(found);
                         synced.insert(repo.to_ascii_lowercase());
                     }
@@ -89,6 +93,11 @@ impl Engine {
             })
             .await;
             *self.synced_repos.lock().await = synced;
+            // A repository that moved on GitHub is followed to its new name.
+            self.read_names(&repos, &mut moves).await;
+            if !moves.is_empty() {
+                self.follow_moves(moves).await;
+            }
             Ok::<(), String>(())
         }
         .await;

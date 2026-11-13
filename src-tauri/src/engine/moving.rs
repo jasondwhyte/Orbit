@@ -169,12 +169,12 @@ impl Engine {
             return Err(why);
         }
         for repo in &mut state.settings.repositories {
-            if let Ok(path) = validate_checkout(&repo.name, &repo.path).await {
+            if let Ok(path) = validate_checkout(&repo.name, &repo.former, &repo.path).await {
                 repo.path = path;
                 continue;
             }
             let folder = self.own_copy(&repo.name).await?;
-            repo.path = validate_checkout(&repo.name, &folder.to_string_lossy())
+            repo.path = validate_checkout(&repo.name, &[], &folder.to_string_lossy())
                 .await
                 .map_err(|e| format!("Orbit's copy of {} can't be used: {e}", repo.name))?;
             repo.keep_updated = true;
@@ -258,7 +258,10 @@ impl Engine {
     }
     /// Waits for the background reads and writes running to finish, until
     /// `until` at most, and holds off new ones until the guards drop.
-    async fn quiet(&self, until: tokio::time::Instant) -> Result<Vec<Reading<'_>>, String> {
+    pub(super) async fn quiet(
+        &self,
+        until: tokio::time::Instant,
+    ) -> Result<Vec<Reading<'_>>, String> {
         let mut held = vec![];
         for flag in [
             &self.refreshing_ledger,

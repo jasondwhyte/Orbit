@@ -152,6 +152,7 @@ async fn queued_selection_is_immutable_and_confirmation_is_durable_before_review
             provider: Default::default(),
             dev_container: Default::default(),
             sandbox: false,
+            former: vec![],
         });
     })
     .await;
@@ -566,6 +567,7 @@ async fn rejected_settings_and_queue_writes_do_not_activate_unsaved_selections_o
             provider: Default::default(),
             dev_container: Default::default(),
             sandbox: false,
+            former: vec![],
         });
     })
     .await;

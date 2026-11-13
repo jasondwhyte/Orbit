@@ -915,6 +915,11 @@ pub struct Repository {
     /// container is off. The check command is `dev_container.check_command`.
     #[serde(default)]
     pub sandbox: bool,
+    /// Its names before it moved on GitHub, oldest first
+    /// (`crate::repo_moves`). Its clone's `origin` may still name one, as
+    /// GitHub sends the old address on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub former: Vec<String>,
 }
 /// Running a repository's setup and checks in its dev container, built from
 /// the base commit's `.devcontainer/` (see `crate::devcontainer`).
@@ -1209,6 +1214,7 @@ impl Repository {
             provider: Provider::default(),
             dev_container: DevContainer::default(),
             sandbox: false,
+            former: vec![],
         }
     }
     /// Whether a review's setup and checks run in Orbit's sandbox: Claude
@@ -1821,6 +1827,7 @@ pub(crate) mod tests {
             provider: Default::default(),
             dev_container: Default::default(),
             sandbox: false,
+            former: vec![],
         });
         assert!(eligible(&p, &s));
         // Not where Orbit stepped back for another Orbit, which reviews it.
@@ -1977,6 +1984,7 @@ pub(crate) mod tests {
             provider: Provider::Claude,
             dev_container: Default::default(),
             sandbox: false,
+            former: vec![],
         });
         assert!(s.validate().unwrap_err().contains("setup command"));
         s.repositories[0].setup_command = " ".into();
@@ -2027,6 +2035,7 @@ pub(crate) mod tests {
                 reviewer_tool: false,
             },
             sandbox: false,
+            former: vec![],
         });
         assert!(s.validate().is_ok());
         s.repositories[0].setup_command = String::new();

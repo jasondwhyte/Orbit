@@ -35,6 +35,7 @@ fn repository(approval_minutes: u32) -> Repository {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     }
 }
 fn run(automatic: bool, status: &str) -> Review {

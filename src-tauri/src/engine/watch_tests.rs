@@ -71,6 +71,7 @@ async fn connected(dir: &Path) -> std::sync::Arc<Engine> {
                 provider: Default::default(),
                 dev_container: Default::default(),
                 sandbox: false,
+                former: vec![],
             });
         }
     })

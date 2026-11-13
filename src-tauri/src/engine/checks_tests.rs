@@ -106,6 +106,7 @@ async fn review_with_recipe(recipe: bool) -> Setup {
                 reviewer_tool: false,
             },
             sandbox: false,
+            former: vec![],
         });
         let mut review = Review::new(&pr, &s.settings, false);
         review.status = "preparing".into();

@@ -23,6 +23,7 @@ fn snapshot() -> Snapshot {
         provider: Default::default(),
         dev_container: Default::default(),
         sandbox: false,
+        former: vec![],
     });
     let mut r = Review::new(&p, &Settings::default(), true);
     r.id = "run-1".into();
